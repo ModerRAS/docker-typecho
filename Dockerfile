@@ -4,13 +4,14 @@ ENV CADDYPATH=/srv/caddycerts
 
 WORKDIR /opt
 
-RUN wget https://github.com/typecho/typecho/archive/master.zip && \
+COPY entrypoint.sh /bin/entrypoint.sh
+
+RUN chomd +x /bin/entrypoint.sh && \
+    wget https://github.com/typecho/typecho/archive/master.zip && \
     unzip master.zip && \
     rm master.zip
     
 WORKDIR /srv/html
-
-COPY entrypoint.sh /bin/entrypoint.sh
 
 EXPOSE 80 443 2015
 VOLUME /srv
