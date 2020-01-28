@@ -4,11 +4,11 @@ test -e /srv/index.php || cp -a /opt/typecho-master/* /srv/html/
 
 chmod -R 777 /srv/html
 
-if   [   $DOMAIN   ]; 
+if   [   $DOMAIN && $EMAIL   ]; 
 then 
 cat > /etc/Caddyfile << EOF
 $DOMAIN {
-    tls
+    tls $EMAIL
     gzip
     cache
     fastcgi / 127.0.0.1:9000 php
