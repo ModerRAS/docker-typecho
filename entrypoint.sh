@@ -1,6 +1,6 @@
 #!/bin/sh
 
-test -e /srv/index.php || cp -a /opt/typecho-master/* /srv
+test -e /srv/index.php || cp -a /opt/typecho-master/* /srv/html/
 
 if   [   $DOMAIN   ]; 
 then 
@@ -16,7 +16,7 @@ $DOMAIN {
         to {path} {path}/ /index.php?{query}
     }
     redir /feed.xml /feed 301
-    root /
+    root /srv/html
 }
 EOF
 else 
@@ -31,7 +31,7 @@ cat > /etc/Caddyfile << EOF
         to {path} {path}/ /index.php?{query}
     }
     redir /feed.xml /feed 301
-    root /
+    root /srv/html
 }
 EOF
 fi
