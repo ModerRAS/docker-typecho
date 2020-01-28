@@ -6,7 +6,7 @@ WORKDIR /opt
 
 COPY entrypoint.sh /bin/entrypoint.sh
 
-RUN chomd +x /bin/entrypoint.sh && \
+RUN chmod +x /bin/entrypoint.sh && \
     wget https://github.com/typecho/typecho/archive/master.zip && \
     unzip master.zip && \
     rm master.zip
