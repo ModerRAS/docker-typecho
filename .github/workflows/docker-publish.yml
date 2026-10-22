@@ -1,0 +1,76 @@
+name: Build and publish Typecho image
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: moderras/docker-typecho
+  PHP_PATCH_VERSION: 8.2.35
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - typecho_version: '1.3.0'
+            typecho_url: https://github.com/typecho/typecho/releases/download/v1.3.0/typecho.zip
+          - typecho_version: '1.2.1'
+            typecho_url: https://github.com/typecho/typecho/releases/download/v1.2.1/typecho.zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ matrix.typecho_version }}
+            type=raw,value=${{ matrix.typecho_version }}-php-${{ env.PHP_PATCH_VERSION }}
+            type=raw,value=${{ matrix.typecho_version }}-php8.2-apache
+            type=raw,value=latest,enable=${{ matrix.typecho_version == '1.3.0' && github.ref == 'refs/heads/master' }}
+            type=sha,enable=${{ matrix.typecho_version == '1.3.0' }}
+            type=sha,prefix=${{ matrix.typecho_version }}-,enable=${{ matrix.typecho_version == '1.2.1' }}
+          flavor: |
+            latest=false
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            PHP_PATCH_VERSION=${{ env.PHP_PATCH_VERSION }}
+            URL=${{ matrix.typecho_url }}
