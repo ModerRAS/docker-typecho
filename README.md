@@ -1,110 +1,118 @@
 # docker-typecho
 
-基于官方 **PHP Apache** 镜像构建的 Typecho 容器，面向 Traefik 等反向代理（容器内仅 HTTP 80，由代理终结 TLS）。
+**`ghcr.io/moderras/docker-typecho` 是官方 [`joyqi/typecho`](https://hub.docker.com/r/joyqi/typecho) Apache 镜像的 drop-in 替代**：沿用 [typecho/Dockerfile](https://github.com/typecho/Dockerfile) 的目录结构、环境变量与入口脚本，仅将 PHP 固定为已修补 **PHP2Shell**（CVE-2026-109618 / CVE-2026-109619）的 **`8.2.35-apache`**，并由本仓库 CI 发布到 GHCR。
 
-| 镜像标签 | Typecho | 说明 |
-|----------|---------|------|
-| `latest`、`1.3.0`、`1.3.0-php8.2.35` | **1.3.0** | 当前稳定版（推荐） |
-| `1.2.1`、`1.2.1-php8.2.35` | **1.2.1** | 旧版主线，便于暂不升级的用户 |
+若你正在使用例如 `joyqi/typecho:1.3.0-php8.2-apache`，只需将镜像名改为下表对应标签，**无需修改**环境变量、卷挂载、端口或已有数据。
 
-- **PHP**：`8.2.35`（已修复 PHP2Shell / CVE-2026-109618、CVE-2026-109619；构建时校验版本）
-- **发布**：`ghcr.io/moderras/docker-typecho`（`linux/amd64`、`linux/arm64`）
+## 标签对照（joyqi → GHCR）
 
-> **说明**：本仓库早期版本使用 `abiosoft/caddy:php`（Caddy + PHP-FPM），并从 GitHub `master` 拉取 Typecho。现已改为官方 `php:8.2.35-apache` + 固定 Typecho 版本（构建参数 `TYPECHO_VERSION`）。
+| joyqi/typecho | ghcr.io/moderras/docker-typecho | Typecho |
+|---------------|----------------------------------|---------|
+| `1.3.0-php8.2-apache` | `1.3.0-php8.2-apache` 或 `1.3.0` | 1.3.0 |
+| `nightly-php8.2-apache` | `latest` 或 `1.3.0-php8.2-apache`（本仓库不构建 nightly 开发包） | 1.3.0 |
+| `1.2.1-php8.2-apache` | `1.2.1-php8.2-apache` 或 `1.2.1` | 1.2.1 |
 
-Typecho **1.2.1** 与 **1.3.0** 均在 **PHP 8.2.35** 上验证可打开安装页（无致命错误）。1.2.1 官方要求 PHP ≥ 7.2，在 8.2 下可正常运行（可能存在弃用提示，但不影响安装流程）。
+附加标签（便于追溯）：`1.3.0-php8.2.35`、`1.2.1-php8.2.35`、git commit SHA（1.3.0 为 `<sha>`，1.2.1 为 `1.2.1-<sha>`）。
 
-## 快速开始
+## 快速开始（与官方 README 一致）
 
 ```bash
-# Typecho 1.3.0（默认）
-docker pull ghcr.io/moderras/docker-typecho:latest
-
-docker run -d \
-  --name typecho \
-  --restart unless-stopped \
-  -p 80:80 \
-  -v /path/to/typecho-data:/srv \
-  -e TYPECHO_SECURE=1 \
-  ghcr.io/moderras/docker-typecho:latest
-
-# Typecho 1.2.1
-docker pull ghcr.io/moderras/docker-typecho:1.2.1
-
-docker run -d \
-  --name typecho-121 \
-  --restart unless-stopped \
-  -p 80:80 \
-  -v /path/to/typecho-data:/srv \
-  -e TYPECHO_SECURE=1 \
-  ghcr.io/moderras/docker-typecho:1.2.1
+docker run --name typecho-server \
+  -e TYPECHO_SITE_URL=https://your-domain.com \
+  -d ghcr.io/moderras/docker-typecho:1.3.0-php8.2-apache
 ```
-
-站点文件位于卷内 **`/srv/html`**（与旧版 Caddy 镜像挂载 `/srv` 的方式兼容）。首次启动会自动将 Typecho 文件复制到该目录。
-
-### 环境变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `TYPECHO_SECURE` | （未设置） | 设为 `1` 时强制 Typecho 使用 `https://` 生成链接（`__TYPECHO_SECURE__`）。未设置时仍可通过代理发来的 `X-Forwarded-Proto: https` 识别 HTTPS。 |
-| `REMOTEIP_TRUSTED_PROXIES` | `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,::1/128` | `mod_remoteip` 信任的代理 CIDR，逗号或空格分隔。 |
-| `APACHE_DOCUMENT_ROOT` | `/srv/html` | 文档根目录，一般无需修改。 |
-
-以下旧版 Caddy 镜像变量 **已不再使用**（TLS 由 Traefik 处理）：`DOMAIN`、`EMAIL`、`ACME_AGREE`。
-
-## Traefik 示例
-
-容器只监听 **80**，请由 Traefik 提供 HTTPS 并转发 `X-Forwarded-Proto` / `X-Forwarded-For`：
 
 ```yaml
 services:
   typecho:
-    image: ghcr.io/moderras/docker-typecho:latest
-    volumes:
-      - ./data:/srv
+    image: ghcr.io/moderras/docker-typecho:1.3.0-php8.2-apache
+    restart: always
     environment:
-      TYPECHO_SECURE: "1"
-      # 若 Traefik 与容器不在默认私网段，请补充其 IP/CIDR：
-      # REMOTEIP_TRUSTED_PROXIES: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,172.18.0.0/16"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.typecho.rule=Host(`blog.example.com`)
-      - traefik.http.routers.typecho.entrypoints=websecure
-      - traefik.http.routers.typecho.tls.certresolver=letsencrypt
-      - traefik.http.services.typecho.loadbalancer.server.port=80
-    networks:
-      - web
-
-networks:
-  web:
-    external: true
+      TYPECHO_SITE_URL: https://your-domain.com
+    ports:
+      - "8080:80"
+    volumes:
+      - /var/typecho:/app/usr
 ```
 
-## PHP2Shell 与安全
+- **工作目录 / 应用路径**：`/app`
+- **数据卷**：`/app/usr`（插件、主题、上传等）
+- **端口**：`80`（HTTP，TLS 由前置反向代理终结）
 
-2026-10-21 披露的 **PHP2Shell**（CVE-2026-109618 / CVE-2026-109619，CVSS 9.2）影响 PHP 5.4–8.5.11，**mod_php（Apache）风险最高**。两个 Typecho 变体均固定使用已修补的 **PHP 8.2.35**，并在 Docker 构建阶段执行 `version_compare` 检查。
+### 自动安装示例（SQLite）
+
+与官方镜像相同，通过环境变量在首次启动时运行 `install.php`（CLI）：
+
+```bash
+docker run --name typecho-server \
+  -e TYPECHO_SITE_URL=http://127.0.0.1:8080 \
+  -e TYPECHO_INSTALL=1 \
+  -e TYPECHO_DB_ADAPTER=Pdo_SQLite \
+  -e TYPECHO_DB_FILE=/app/usr/uploads/typecho.db \
+  -v typecho-data:/app/usr \
+  -p 8080:80 \
+  -d ghcr.io/moderras/docker-typecho:1.3.0-php8.2-apache
+```
+
+> SQLite 数据库文件需放在 `www-data` 可写的路径（通常为 `/app/usr/uploads/...`）。若将卷挂载到 `/app/usr`，卷根目录可能为 `root` 所有，与官方镜像行为一致。
+
+## 环境变量（与 [官方文档](https://github.com/typecho/Dockerfile) 一致）
+
+| 名称 | 说明 |
+|------|------|
+| `TIMEZONE` | 默认 `UTC`，例如 `Asia/Shanghai` |
+| `MEMORY_LIMIT` | PHP `memory_limit` |
+| `MAX_POST_BODY` | `upload_max_filesize` / `post_max_size` |
+| `MAX_EXECUTION_TIME` | 默认 `30`（镜像内 `ENV`，与上游一致） |
+| `TYPECHO_INSTALL` | 默认 `0`；设为 `1` 自动执行安装 |
+| `TYPECHO_DB_ADAPTER` | 默认 `Pdo_Mysql`；可选 `Pdo_SQLite`、`Pdo_Pgsql` 等 |
+| `TYPECHO_DB_HOST` | MySQL/Pg 主机，默认 `localhost` |
+| `TYPECHO_DB_PORT` | MySQL `3306` / Pg `5432` |
+| `TYPECHO_DB_USER` | MySQL/Pg 用户名 |
+| `TYPECHO_DB_PASSWORD` | MySQL/Pg 密码 |
+| `TYPECHO_DB_FILE` | SQLite 数据库路径 |
+| `TYPECHO_DB_DATABASE` | MySQL/Pg 库名 |
+| `TYPECHO_DB_PREFIX` | 默认 `typecho_` |
+| `TYPECHO_DB_ENGINE` | MySQL 引擎，默认 `InnoDB` |
+| `TYPECHO_DB_CHARSET` | 默认 MySQL `utf8mb4` / Pg `utf8` |
+| `TYPECHO_DB_NEXT` | 默认 `none`；`keep` / `force` |
+| `TYPECHO_SITE_URL` | **必填**（安装时）站点 URL |
+| `TYPECHO_USER_NAME` | 默认 `typecho` |
+| `TYPECHO_USER_PASSWORD` | 默认随机 8 位 |
+| `TYPECHO_USER_MAIL` | 默认 `admin@localhost.local` |
+
+Typecho 1.3 安装程序还支持（上游 install.php）：`TYPECHO_DB_DSN`、`TYPECHO_DB_SSL_CA`、`TYPECHO_DB_SSL_VERIFY`。
+
+### 可选（本仓库新增，默认关闭）
+
+| 名称 | 说明 |
+|------|------|
+| `REMOTEIP_TRUSTED_PROXIES` | 逗号分隔的 CIDR；设置后启用 Apache `mod_remoteip` 信任 `X-Forwarded-For`。未设置时与 joyqi 行为相同。Typecho 1.3 已原生识别 `X-Forwarded-Proto`。 |
+
+## 与 joyqi 的差异
+
+| 项目 | joyqi/typecho | 本镜像 |
+|------|---------------|--------|
+| PHP | 8.2.30（未修补 PHP2Shell） | **8.2.35**（构建时强制版本校验） |
+|  registry | Docker Hub | **ghcr.io** |
+| 其余 | — | 可选 `REMOTEIP_TRUSTED_PROXIES`；含 `pdo_sqlite`（与当前 joyqi 8.2-apache 模块一致） |
+
+## PHP2Shell
+
+2026-10-21 披露的 PHP2Shell 影响 PHP 5.4–8.5.11，mod_php 风险最高。本镜像固定 **PHP 8.2.35** 并在构建阶段执行 `version_compare` 检查。
 
 ## 本地构建
 
 ```bash
-# Typecho 1.3.0
-docker build --build-arg TYPECHO_VERSION=1.3.0 -t docker-typecho:1.3.0 .
-
-# Typecho 1.2.1
-docker build --build-arg TYPECHO_VERSION=1.2.1 -t docker-typecho:1.2.1 .
-
-docker run --rm -p 8080:80 docker-typecho:1.3.0
+docker build \
+  --build-arg URL=https://github.com/typecho/typecho/releases/download/v1.3.0/typecho.zip \
+  -t docker-typecho:local .
 ```
 
-## CI
+## 上游与许可
 
-推送到默认分支、打 tag、手动触发或 **每周一** 定时任务会为 **1.3.0** 与 **1.2.1** 各构建并推送多架构镜像。
-
-| 变体 | 主要标签 |
-|------|----------|
-| 1.3.0 | `latest`、`1.3.0`、`1.3.0-php8.2.35`、`<git-sha>` |
-| 1.2.1 | `1.2.1`、`1.2.1-php8.2.35`、`1.2.1-<git-sha>`（不会覆盖 `latest`） |
+`scripts/` 来自 [typecho/Dockerfile](https://github.com/typecho/Dockerfile)（GPL-2.0），见 [UPSTREAM.md](UPSTREAM.md)。
 
 ## License
 
-See [LICENSE](LICENSE).
+See [LICENSE](LICENSE)（本仓库 MIT；上游 Docker 脚本为 GPL-2.0）。
