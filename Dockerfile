@@ -1,5 +1,5 @@
-# Patched PHP (PHP2Shell/CVE-2026-109618) + Apache + Typecho 1.3.x
-# Typecho 1.3 requires PHP >= 7.4; upstream recommends PHP 8.2. We use 8.2.35 (patched).
+# Patched PHP (PHP2Shell/CVE-2026-109618) + Apache + Typecho (build-arg TYPECHO_VERSION)
+# Typecho >= 1.2 requires PHP >= 7.4; upstream recommends PHP 8.2. We use 8.2.35 (patched).
 ARG PHP_MINOR=8.2
 ARG PHP_PATCH_VERSION=8.2.35
 FROM php:${PHP_PATCH_VERSION}-apache-bookworm
@@ -39,6 +39,7 @@ RUN set -eux; \
 
 WORKDIR /opt
 
+ARG TYPECHO_VERSION
 RUN set -eux; \
     wget -q "https://github.com/typecho/typecho/archive/refs/tags/v${TYPECHO_VERSION}.tar.gz" -O typecho.tar.gz; \
     tar -xzf typecho.tar.gz; \

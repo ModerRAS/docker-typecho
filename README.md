@@ -2,15 +2,22 @@
 
 基于官方 **PHP Apache** 镜像构建的 Typecho 容器，面向 Traefik 等反向代理（容器内仅 HTTP 80，由代理终结 TLS）。
 
-- **Typecho**：v1.3.0（当前稳定版）
-- **PHP**：`8.2.35`（已修复 [PHP2Shell](https://nvd.nist.gov/) / CVE-2026-109618、CVE-2026-109619；构建时校验版本，避免回落到未修补 PHP）
-- **发布**：`ghcr.io/moderras/docker-typecho`
+| 镜像标签 | Typecho | 说明 |
+|----------|---------|------|
+| `latest`、`1.3.0`、`1.3.0-php8.2.35` | **1.3.0** | 当前稳定版（推荐） |
+| `1.2.1`、`1.2.1-php8.2.35` | **1.2.1** | 旧版主线，便于暂不升级的用户 |
 
-> **说明**：本仓库早期版本使用 `abiosoft/caddy:php`（Caddy + PHP-FPM），并从 GitHub `master` 拉取 Typecho。现已改为官方 `php:8.2.35-apache` + Typecho 1.3.0 固定版本。
+- **PHP**：`8.2.35`（已修复 PHP2Shell / CVE-2026-109618、CVE-2026-109619；构建时校验版本）
+- **发布**：`ghcr.io/moderras/docker-typecho`（`linux/amd64`、`linux/arm64`）
+
+> **说明**：本仓库早期版本使用 `abiosoft/caddy:php`（Caddy + PHP-FPM），并从 GitHub `master` 拉取 Typecho。现已改为官方 `php:8.2.35-apache` + 固定 Typecho 版本（构建参数 `TYPECHO_VERSION`）。
+
+Typecho **1.2.1** 与 **1.3.0** 均在 **PHP 8.2.35** 上验证可打开安装页（无致命错误）。1.2.1 官方要求 PHP ≥ 7.2，在 8.2 下可正常运行（可能存在弃用提示，但不影响安装流程）。
 
 ## 快速开始
 
 ```bash
+# Typecho 1.3.0（默认）
 docker pull ghcr.io/moderras/docker-typecho:latest
 
 docker run -d \
@@ -20,6 +27,17 @@ docker run -d \
   -v /path/to/typecho-data:/srv \
   -e TYPECHO_SECURE=1 \
   ghcr.io/moderras/docker-typecho:latest
+
+# Typecho 1.2.1
+docker pull ghcr.io/moderras/docker-typecho:1.2.1
+
+docker run -d \
+  --name typecho-121 \
+  --restart unless-stopped \
+  -p 80:80 \
+  -v /path/to/typecho-data:/srv \
+  -e TYPECHO_SECURE=1 \
+  ghcr.io/moderras/docker-typecho:1.2.1
 ```
 
 站点文件位于卷内 **`/srv/html`**（与旧版 Caddy 镜像挂载 `/srv` 的方式兼容）。首次启动会自动将 Typecho 文件复制到该目录。
@@ -64,20 +82,28 @@ networks:
 
 ## PHP2Shell 与安全
 
-2026-10-21 披露的 **PHP2Shell**（CVE-2026-109618 / CVE-2026-109619，CVSS 9.2）影响 PHP 5.4–8.5.11，**mod_php（Apache）风险最高**。本镜像固定使用已修补的 **PHP 8.2.35**，并在 Docker 构建阶段执行 `version_compare` 检查。
-
-Typecho 1.3 要求 PHP ≥ 7.4；官方建议使用 PHP 8.2。选择 8.2.35 而非 8.4.x 是为了与 Typecho 官方推荐主线一致，同时满足安全修补要求。
+2026-10-21 披露的 **PHP2Shell**（CVE-2026-109618 / CVE-2026-109619，CVSS 9.2）影响 PHP 5.4–8.5.11，**mod_php（Apache）风险最高**。两个 Typecho 变体均固定使用已修补的 **PHP 8.2.35**，并在 Docker 构建阶段执行 `version_compare` 检查。
 
 ## 本地构建
 
 ```bash
-docker build -t docker-typecho:local .
-docker run --rm -p 8080:80 docker-typecho:local
+# Typecho 1.3.0
+docker build --build-arg TYPECHO_VERSION=1.3.0 -t docker-typecho:1.3.0 .
+
+# Typecho 1.2.1
+docker build --build-arg TYPECHO_VERSION=1.2.1 -t docker-typecho:1.2.1 .
+
+docker run --rm -p 8080:80 docker-typecho:1.3.0
 ```
 
 ## CI
 
-推送到默认分支、打 tag、手动触发或 **每周一** 定时任务会构建 `linux/amd64` 与 `linux/arm64` 镜像并推送到 GHCR。标签包括 `latest`（默认分支）、`php-8.2.35` 以及 git commit SHA。
+推送到默认分支、打 tag、手动触发或 **每周一** 定时任务会为 **1.3.0** 与 **1.2.1** 各构建并推送多架构镜像。
+
+| 变体 | 主要标签 |
+|------|----------|
+| 1.3.0 | `latest`、`1.3.0`、`1.3.0-php8.2.35`、`<git-sha>` |
+| 1.2.1 | `1.2.1`、`1.2.1-php8.2.35`、`1.2.1-<git-sha>`（不会覆盖 `latest`） |
 
 ## License
 
